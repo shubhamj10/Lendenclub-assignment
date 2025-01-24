@@ -1,96 +1,82 @@
 terraform {
   required_providers {
     docker = {
-      source = "kreuzwerker/docker"
-      version = "~> 2.0"
+      source  = "kreuzwerker/docker"
+      version = ">= 3.0.1"
     }
   }
 }
 
 provider "docker" {
-  host = "unix:///var/run/docker.sock"
+  host    = "unix:///var/run/docker.sock"
+  registry_auth {
+    address  = "docker.io" # Replace with the correct registry URL if different
+    username = "shubhamjankar04"
+    password = "DevOps@123"
 }
 
-resource "docker_network" "app_network" {
-  name = "app-network"
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
-resource "docker_volume" "mongo_data" {
-  name = "mongo-data"
+# Docker Network
+resource "docker_network" "project_network" {
+  name = "project_network"
 }
 
+# MongoDB Container
 resource "docker_container" "mongo" {
-  name  = "mongo"
-  image = "mongo:latest"
-
+  name  = "mongo_container"
+  image = "mongo:6.0" # Use pre-built MongoDB image
   ports {
     internal = 27017
     external = 27017
   }
-
-  volumes {
-    container_path = "/data/db"
-    volume_name      = docker_volume.mongo_data.name
-  }
-
   networks_advanced {
-    name = docker_network.app_network.name
+    name = docker_network.project_network.name
   }
 }
 
-resource "docker_image" "backend_image" {
-  name   = "backend:latest"
+# Frontend Image
+resource "docker_image" "frontend" {
+  name = "frontend"
   build {
-    context    = "./backend"
-    dockerfile = "./backend/Dockerfile"
+    context    = "/Users/shashikant.bandgar/Desktop/Lendenclub/registrationform/frontend" 
+    dockerfile = "Dockerfile"             
+    no_cache   = true
   }
 }
 
-resource "docker_container" "backend" {
-  name  = "backend"
-  image = docker_image.backend_image.name 
-
-  ports {
-    internal = 3001
-    external = 3001
-  }
-
-
-  command = ["node", "index.js"]
-
-  networks_advanced {
-    name = docker_network.app_network.name
-  }
-
-  depends_on = [docker_container.mongo]
-}
-
-resource "docker_image" "frontend_image" {
-  name   = "frontend:latest"
-  build {
-    context    = "./frontend"
-    dockerfile = "./frontend/Dockerfile"
-  }
-}
-
+# Frontend Container
 resource "docker_container" "frontend" {
   name  = "frontend"
-  image = docker_image.frontend_image.name
-
+  image = docker_image.frontend.name
   ports {
-    internal = 5173
-    external = 5173
+    internal = 3000
+    external = 3000
   }
-
-  command = ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
-
   networks_advanced {
-    name = docker_network.app_network.name
+    name = docker_network.project_network.name
   }
+}
 
-  depends_on = [docker_container.backend]
+# Backend Image
+  resource "docker_image" "backend" {
+  name = "backend"
+  build {
+    context    = "/Users/shashikant.bandgar/Desktop/Lendenclub/registrationform/backend" 
+    dockerfile = "Dockerfile"             
+    no_cache   = true
+  }
+}
+
+# Backend Container
+resource "docker_container" "backend" {
+  name  = "backend"
+  image = docker_image.backend.name
+  ports {
+    internal = 8000
+    external = 8000
+  }
+  networks_advanced {
+    name = docker_network.project_network.name
+  }
 }
